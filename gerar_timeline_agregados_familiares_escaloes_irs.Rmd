@@ -1,0 +1,84 @@
+---
+title: "Agregados Familiares por Escalões do IRS"
+author: "Tiago dos Santos"
+date: "10/2/2020"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+```
+
+
+```{r process-data, include=FALSE}
+agregados_por_escaloes_irs = read.csv("data/pordata_agregados_familiares_por_escaloes_irs_modelo1.csv")
+agregados_por_escaloes_irs_perc = agregados_por_escaloes_irs
+agregados_por_escaloes_irs_perc[3:13] = round(apply(agregados_por_escaloes_irs[3:13],2,function(x){
+  x/agregados_por_escaloes_irs$Total
+}),4)
+
+agregados_por_escaloes_irs_indexado_Ano = reshape2::melt(agregados_por_escaloes_irs, id=c("Ano"))
+agregados_por_escaloes_irs_perc_indexado_Ano = reshape2::melt(agregados_por_escaloes_irs_perc, id=c("Ano"))
+
+agregados_por_escaloes_irs_indexado_Ano_perc = merge(agregados_por_escaloes_irs_indexado_Ano, 
+                                                     agregados_por_escaloes_irs_perc_indexado_Ano, 
+                                                     by=c("Ano","variable"))
+colnames(agregados_por_escaloes_irs_indexado_Ano_perc) = c("Ano", "Escalao", "Contagem", "Percentagem")
+agregados_por_escaloes_irs_indexado_Ano_perc = agregados_por_escaloes_irs_indexado_Ano_perc %>%
+  dplyr::filter(Escalao != "Total")
+
+agregados_por_escaloes_irs_indexado_Ano_perc$Escalao = 
+  substring(agregados_por_escaloes_irs_indexado_Ano_perc$Escalao, 2)
+
+agregados_por_escaloes_irs_indexado_Ano_perc$Escalao = as.character(
+  agregados_por_escaloes_irs_indexado_Ano_perc$Escalao)
+
+agregados_por_escaloes_irs_indexado_Ano_perc$Ano = as.numeric(
+  agregados_por_escaloes_irs_indexado_Ano_perc$Ano
+)
+
+agregados_por_escaloes_irs_indexado_Ano_perc$MinEscalao = 
+  sapply(agregados_por_escaloes_irs_indexado_Ano_perc$Escalao,
+        function(escalao_str){
+          as.numeric(strsplit(escalao_str, "\\.\\.\\.")[[1]][1])
+        }
+  )
+
+agregados_por_escaloes_irs_indexado_Ano_perc = 
+  agregados_por_escaloes_irs_indexado_Ano_perc[order(
+    agregados_por_escaloes_irs_indexado_Ano_perc$Ano,
+    agregados_por_escaloes_irs_indexado_Ano_perc$MinEscalao
+  ),]
+
+agregados_por_escaloes_irs_indexado_Ano_perc = agregados_por_escaloes_irs_indexado_Ano_perc %>% 
+  group_by(Ano) %>% 
+  mutate(cs = cumsum(Percentagem))
+
+agregados_por_escaloes_irs_indexado_Ano_perc$cs = pmin(
+  agregados_por_escaloes_irs_indexado_Ano_perc$cs, 1
+)
+```
+
+```{r barplot-timeline-agregados-familiares-escaloes-irs, echo=FALSE, out.width= '100%', out.height='100%'}
+agregados_por_escaloes_irs_indexado_Ano_perc %>%
+  echarts4r::group_by(Ano) %>%
+  echarts4r::e_charts(Escalao, timeline = TRUE) %>%
+  echarts4r::e_bar(Contagem, name = "Função Distribuição do Escalão") %>%
+  echarts4r::e_line(cs, name = "Função Densidade do Escalão", x_index = 1, y_index = 1, symbolSize=10) %>%
+  echarts4r::e_tooltip() %>%
+  echarts4r::e_y_axis(max=1310000, type="log") %>%
+  echarts4r::e_title("Agregados Familiares por Escalões do IRS") %>%
+  echarts4r::e_legend(x='right')
+```
+
+```{r radialplot-timeline, echo=FALSE, include=F, eval=F}
+agregados_por_escaloes_irs_indexado_Ano %>%
+  echarts4r::group_by(Ano) %>%
+  echarts4r::e_charts(variable, timeline = TRUE) %>%
+  echarts4r::e_polar() %>% 
+  echarts4r::e_angle_axis(variable) %>% # angle = x
+  echarts4r::e_radius_axis(max=1310000, type = 'log') %>% 
+  echarts4r::e_bar(value, coord_system = "polar") %>%
+  echarts4r::e_labels(position="bottom")
+```
+
