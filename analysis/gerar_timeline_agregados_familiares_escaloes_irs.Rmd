@@ -99,7 +99,7 @@ irs_indexado_Ano %>%
   echarts4r::e_bar(Contagem_Modelo2, name = "Função Densidade Modelo2", stack="grp1") %>%
   echarts4r::e_line(FDA_Modelo12, name = "Função Distribuição Acumulada", x_index = 1, y_index = 1, symbolSize=10) %>%
   echarts4r::e_tooltip() %>%
-  echarts4r::e_y_axis(max=1500000) %>%
+  echarts4r::e_y_axis(max=round(max(irs_indexado_Ano$Contagem_Modelo12)*1.05,0)) %>%
   echarts4r::e_legend(x='right')
 ```
 
@@ -109,7 +109,7 @@ agregados_por_escaloes_irs_indexado_Ano %>%
   echarts4r::e_charts(variable, timeline = TRUE) %>%
   echarts4r::e_polar() %>% 
   echarts4r::e_angle_axis(variable) %>% # angle = x
-  echarts4r::e_radius_axis(max=1310000, type = 'log') %>% 
+  echarts4r::e_radius_axis(max=1500000, type = 'log') %>% 
   echarts4r::e_bar(value, coord_system = "polar") %>%
   echarts4r::e_labels(position="bottom")
 ```
