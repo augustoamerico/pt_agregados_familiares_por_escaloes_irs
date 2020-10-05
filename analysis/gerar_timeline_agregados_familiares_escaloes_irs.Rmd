@@ -1,0 +1,116 @@
+---
+title: "Agregados Familiares por Escalões do IRS"
+author: "Tiago dos Santos"
+date: "10/2/2020"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+```
+
+
+```{r process-data, include=FALSE}
+
+to_percentages = function(df, normalizer, perc_decimal_places = 3){
+   df %>% 
+    dplyr::mutate_at(
+      dplyr::vars(dplyr::matches("\\.\\.\\.")), 
+      function(escalao){round(escalao/normalizer,perc_decimal_places)}
+      ) 
+}
+
+read_irs_from_file <- function(file_path, perc_decimal_places = 3){
+  irs_data = read.csv(file_path)
+  irs_data_perc = to_percentages(irs_data, irs_data$Total, perc_decimal_places)
+  return(
+    list(
+      absolute=irs_data,
+      percentage=irs_data_perc
+    )
+  )
+}
+
+irs_modelo1 = 
+  read_irs_from_file(file.path(PROJHOME, "data", "pordata_agregados_familiares_por_escaloes_irs_modelo1.csv"))
+
+irs_modelo2 = 
+  read_irs_from_file(file.path(PROJHOME, "data", "pordata_agregados_familiares_por_escaloes_irs_modelo2.csv"))
+
+irs_modelo12_abs = irs_modelo1$absolute
+irs_modelo12_abs[,2:13] = irs_modelo1$absolute[,2:13] + irs_modelo2$absolute[,2:13]
+irs_modelo12_perc =to_percentages(irs_modelo12_abs, irs_modelo12_abs$Total)
+
+irs_modelo1_cont_indexado_Ano = reshape2::melt(irs_modelo1$absolute, id=c("Ano"))
+irs_modelo1_perc_indexado_Ano = reshape2::melt(irs_modelo1$percentage, id=c("Ano"))
+irs_modelo2_cont_indexado_Ano = reshape2::melt(irs_modelo2$absolute, id=c("Ano"))
+irs_modelo2_perc_indexado_Ano = reshape2::melt(irs_modelo2$percentage, id=c("Ano"))
+irs_modelo12_cont_indexado_Ano = reshape2::melt(irs_modelo12_abs, id=c("Ano"))
+irs_modelo12_perc_indexado_Ano = reshape2::melt(irs_modelo12_perc, id=c("Ano"))
+
+irs_indexado_Ano = Reduce(
+  function(left, right){merge(left, right, by=c("Ano","variable"))}, 
+  list(irs_modelo1_cont_indexado_Ano, irs_modelo1_perc_indexado_Ano, 
+       irs_modelo2_cont_indexado_Ano, irs_modelo2_perc_indexado_Ano,
+       irs_modelo12_cont_indexado_Ano, irs_modelo12_perc_indexado_Ano))
+
+colnames(irs_indexado_Ano) = c("Ano", "Escalao", 
+                               "Contagem_Modelo1", "Percentagem_Modelo1",  
+                               "Contagem_Modelo2", "Percentagem_Modelo2", 
+                               "Contagem_Modelo12", "Percentagem_Modelo12")
+
+irs_indexado_Ano = irs_indexado_Ano %>%
+  dplyr::filter(Escalao != "Total")
+
+irs_indexado_Ano$Escalao = 
+  as.character(substring(irs_indexado_Ano$Escalao, 2))
+
+irs_indexado_Ano$Ano = as.numeric(
+  irs_indexado_Ano$Ano
+)
+
+irs_indexado_Ano$MinEscalao = 
+  sapply(irs_indexado_Ano$Escalao,
+        function(escalao_str){
+          as.numeric(strsplit(escalao_str, "\\.\\.\\.")[[1]][1])
+        }
+  )
+
+irs_indexado_Ano = 
+  irs_indexado_Ano[order(
+    irs_indexado_Ano$Ano,
+    irs_indexado_Ano$MinEscalao
+  ),]
+
+irs_indexado_Ano = irs_indexado_Ano %>% 
+  group_by(Ano) %>% 
+  mutate(FDA_Modelo12 = cumsum(Percentagem_Modelo12))
+
+irs_indexado_Ano$FDA_Modelo12 = pmin(irs_indexado_Ano$FDA_Modelo12,1)
+```
+
+## Agregados Familiares por Escalões do IRS
+
+```{r barplot-timeline-agregados-familiares-escaloes-irs, echo=FALSE, out.width= '100%', out.height='100%', warnings=F}
+irs_indexado_Ano %>%
+  echarts4r::group_by(Ano) %>%
+  echarts4r::e_charts(Escalao, timeline = TRUE) %>%
+  echarts4r::e_bar(Contagem_Modelo1, name = "Função Densidade Modelo1", stack="grp1") %>%
+  echarts4r::e_bar(Contagem_Modelo2, name = "Função Densidade Modelo2", stack="grp1") %>%
+  echarts4r::e_line(FDA_Modelo12, name = "Função Distribuição Acumulada", x_index = 1, y_index = 1, symbolSize=10) %>%
+  echarts4r::e_tooltip() %>%
+  echarts4r::e_y_axis(max=1500000) %>%
+  echarts4r::e_legend(x='right')
+```
+
+```{r radialplot-timeline, echo=FALSE, include=F, eval=F}
+agregados_por_escaloes_irs_indexado_Ano %>%
+  echarts4r::group_by(Ano) %>%
+  echarts4r::e_charts(variable, timeline = TRUE) %>%
+  echarts4r::e_polar() %>% 
+  echarts4r::e_angle_axis(variable) %>% # angle = x
+  echarts4r::e_radius_axis(max=1310000, type = 'log') %>% 
+  echarts4r::e_bar(value, coord_system = "polar") %>%
+  echarts4r::e_labels(position="bottom")
+```
+

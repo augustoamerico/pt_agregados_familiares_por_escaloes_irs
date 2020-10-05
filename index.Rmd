@@ -1,0 +1,11 @@
+--- 
+title: "Estatísticas de IRS em Portugal"
+author: "Tiago dos Santos"
+date: "`r Sys.Date()`"
+site: bookdown::bookdown_site
+---
+
+# Estatísticas de IRS em Portugal
+
+```{r escaloes-irs, child="./analysis/gerar_timeline_agregados_familiares_escaloes_irs.Rmd"}
+```
